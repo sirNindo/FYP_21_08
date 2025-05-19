@@ -82,9 +82,22 @@ void setup() {
 
   INA.setMaxCurrentShunt(1.0, 0.002);
 
+  // display.clearDisplay();
+  // display.setTextSize(1);
+  // display.setTextColor(SH110X_WHITE);
+  // display.setCursor(0, 0);
+  // display.println("Hello, ESP32!");
+  // int biz = 100;
+  // display.print("Hello, ESP32!");
+  // display.print("Hello, ESP32!");
+  // display.display();
 }
 
 void loop() {
+
+  // float voltage = 12.5;    // from INA229 or ADC
+  // float current = 0.42;    // from sensor
+  // float power = voltage * current;
 
   const char* mode = "GEN"; // could also be "BRAKE", "IDLE", etc.
 
@@ -108,7 +121,8 @@ void loop() {
       lastInaRetry = millis();
     }
 
-    // Show message on OLED
+        // Show message on OLED
+    
     display.println(" INA!");
     
 
@@ -118,6 +132,15 @@ void loop() {
     
   }
   showPowerOutput(voltage, current, power, mode);
+  
+  
+
+  // float voltage; float shuntMV; float current; float power;
+  // INAdebug(voltage, shuntMV, current, power);
+  // showPowerOutput(voltage, current, power, mode);
+  // delay(1000); // refresh every second
+
+  
   
 }
 
@@ -135,7 +158,17 @@ void loop() {
  */
 
 void showPowerOutput(float voltage, float current, float power, const char* mode) {
+  // // Clear the OLED display buffer
+  // display.clearDisplay();
   
+  // // Set text size and color
+  // display.setTextSize(1);
+  // display.setTextColor(SH110X_WHITE);
+
+  // // Display heading for the section
+  // display.setCursor(0, 0);
+  // display.print("Power Monitor Mode: ");
+  // display.println(mode);
 
   display.setTextSize(2); // Larger text for important metrics
 
@@ -195,7 +228,7 @@ void INAdebug(float voltage, float shuntMV, float current, float power){
     // Serial.print(INA1.getCurrent_mA(), 3);
     // Serial.print("\t");
     // Serial.print(INA1.getPower_mW(), 3);
-    // Serial.println();  
+    // Serial.println();
     delay(1000);
   }
 }
