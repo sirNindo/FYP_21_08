@@ -1,15 +1,15 @@
 
 #include <Wire.h>
-#include <WiFi.h>
-#include <PubSubClient.h>
-#include <SPIFFS.h> 
+// #include <WiFi.h>
+// #include <PubSubClient.h>
+// #include <SPIFFS.h> 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
 #include <INA226.h>
 
 // Pins
-#define INA_SDA 26
-#define INA_SCL 27
+#define INA_SDA 18
+#define INA_SCL 19
 #define OLED_SDA 32
 #define OLED_SCL 33
 
@@ -26,7 +26,7 @@ unsigned long lastInaRetry = 0;
 TwoWire PwrSensor1 =TwoWire(0);
 INA226 INA(0x40);  // Default I2C address is 0x40
 // INA226 INA1(0x41);
-TwoWire Viewer = TwoWire(0);  // bus number 2, you can choose 1, 2, etc.
+TwoWire Viewer = TwoWire(1);  // bus number 2, you can choose 1, 2, etc.
 Adafruit_SH1106G display = Adafruit_SH1106G(128, 64, &Viewer, -1); // I2C OLED object Initialisation
 
 
@@ -37,10 +37,23 @@ void INAdebug(float voltage, float shuntMV, float current, float power);
 
 void setup() {
   Serial.begin(115200);
+  Wire.begin(INA_SDA, INA_SCL); //First Voltage sensor 
+  // PwrSensor1.begin(INA_SDA, INA_SCL); //First Voltage sensor
+
+  if (!INA.begin()) {
+    Serial.println("INA0 could not connect. Will retry in loop...");
+    inaInitialized = false;
+  } else {
+    inaInitialized = true;
+    Serial.println("INA0 connected successfully.");
+    INA.setMaxCurrentShunt(1.0, 0.002);
+  }
+  INA.setMaxCurrentShunt(1.0, 0.002);
+  
   Viewer.begin(OLED_SDA,OLED_SCL,100000);  // OLED Display I2C starting // Confirm your pins
   if (!display.begin(0x3C, true)) {
     Serial.println("Display not found");
-    while (1);
+    // while (1);
   }
 
   display.clearDisplay();
@@ -55,16 +68,9 @@ void setup() {
   // Serial.print("INA226_LIB_VERSION: ");
   // Serial.println(INA226_LIB_VERSION);
 
-  // Wire.begin(19,18); //First Voltage sensor 
-  PwrSensor1.begin(INA_SDA, INA_SCL, 100000); //First Voltage sensor 
+ 
   
-  if (INA.begin()) {
-    inaInitialized = true;
-    Serial.println("INA0 connected successfully.");
-    INA.setMaxCurrentShunt(1.0, 0.002);
-  } else {
-    Serial.println("INA0 could not connect. Will retry in loop...");
-  }
+
   // if (!INA.begin() )
   // {
   //   Serial.println("INA0 could not connect. Fix and Reboot");
@@ -80,7 +86,7 @@ void setup() {
   //   Serial.println("INA1 could not connect. Fix and Reboot");
   // }
 
-  INA.setMaxCurrentShunt(1.0, 0.002);
+  // INA.setMaxCurrentShunt(1.0, 0.002);
 
 }
 
@@ -88,6 +94,11 @@ void loop() {
 
   const char* mode = "GEN"; // could also be "BRAKE", "IDLE", etc.
 
+  voltage = INA.getBusVoltage();
+  shuntMV = INA.getShuntVoltage_mV();
+  current = INA.getCurrent_mA() / 1000.0; // Convert to A
+  power = INA.getPower_mW() / 1000.0;     // Convert to W
+  
   display.clearDisplay();
   display.setCursor(0, 0);
   display.setTextSize(1);
@@ -98,19 +109,19 @@ void loop() {
   if (!inaInitialized) {
     if (millis() - lastInaRetry > 5000) {  // Retry every 5 seconds
       Serial.println("Retrying INA0...");
-      if (INA.begin()) {
+      if (!INA.begin()) {
+        Serial.println("INA0 still not found.");
+      } else {
         inaInitialized = true;
         Serial.println("INA0 initialized on retry.");
         INA.setMaxCurrentShunt(1.0, 0.002);
-      } else {
-        Serial.println("INA0 still not found.");
       }
       lastInaRetry = millis();
     }
 
     // Show message on OLED
     display.println(" INA!");
-    
+    INAdebug(voltage, shuntMV, current, power);
 
   } else {
   
