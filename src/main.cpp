@@ -12,7 +12,14 @@
   #define INA_SCL 19
   #define OLED_SDA 32
   #define OLED_SCL 33
+  #define BRAKE_PIN1 14
+  #define BRAKE_PIN2 25
+  #define BRAKE_CH1 0
+  #define BRAKE_CH2 2
 
+  //braking
+  #define PWM_FREQ 5000
+  #define PWM_RES 8
   // WiFi credentials
   const char* ssid = ".......";
   const char* password = "RasmusHojlund11";
@@ -53,6 +60,13 @@
   void publishJsonData(float voltage, float shuntMV, float current, float power, const char* mode);
 
   void setup() {
+      // Setup channels and attach to pins
+    ledcSetup(BRAKE_CH1, PWM_FREQ, PWM_RES);
+    ledcAttachPin(BRAKE_PIN1, BRAKE_CH1);
+
+    ledcSetup(BRAKE_CH2, PWM_FREQ, PWM_RES);
+    ledcAttachPin(BRAKE_PIN2, BRAKE_CH2);
+    
     Serial.begin(115200);
     Wire.begin(INA_SDA, INA_SCL); //First Voltage sensor 
     // PwrSensor1.begin(INA_SDA, INA_SCL); //First Voltage sensor
@@ -67,7 +81,7 @@
     }
     INA.setMaxCurrentShunt(1.0, 0.002);
   
-    Viewer.begin(OLED_SDA, OLED_SCL, 100000);  // OLED Display I2C starting // Confirm your pins
+    Viewer.begin(OLED_SDA, OLED_SCL);  // OLED Display I2C starting // Confirm your pins
     if (!display.begin(0x3C, true)) {
       Serial.println("Display not found");
       // while (1);
@@ -99,7 +113,19 @@
     shuntMV = INA.getShuntVoltage_mV();
     current = INA.getCurrent_mA() / 1000.0; // Convert to A
     power = INA.getPower_mW() / 1000.0;     // Convert to W
-  
+
+    int start_duty = 245;
+    int end_duty =12;
+
+    if(voltage>8.5){
+      for(int duty =start_duty; duty<=end_duty; duty++){
+        ledcWrite(BRAKE_CH1, duty);
+        ledcWrite(BRAKE_CH2, duty);
+        delay(10);
+      }
+
+
+    }
     display.clearDisplay();
     display.setCursor(0, 0);
     display.setTextSize(1);
