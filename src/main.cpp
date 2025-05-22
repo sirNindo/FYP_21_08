@@ -21,11 +21,11 @@
   #define PWM_FREQ 5000
   #define PWM_RES 8
   // WiFi credentials
-  const char* ssid = ".......";
-  const char* password = "RasmusHojlund11";
+  const char* ssid = "<YourSSID>";
+  const char* password = "<Your_Pass>";
 
   // MQTT Broker settings - Use your PC's IP address
-  const char* mqtt_server = "192.168.1.5";  // Replace with your PC's IP address
+  const char* mqtt_server = "192.168.1.0";  // Replace with your PC's IP address
   const int mqtt_port = 1883;               // Default MQTT port
   const char* client_id = "ESP32_PowerMonitor";
 
