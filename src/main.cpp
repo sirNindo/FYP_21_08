@@ -6,6 +6,7 @@
   #include <Adafruit_GFX.h>
   #include <Adafruit_SH110X.h>
   #include <INA226.h>
+  #include "secrets.h"
 
   // Pins
   #define INA_SDA 18
@@ -21,11 +22,10 @@
   #define PWM_FREQ 5000
   #define PWM_RES 8
   // WiFi credentials
-  const char* ssid = "<YourSSID>";
-  const char* password = "<Your_Pass>";
-
+  const char* ssid = WIFI_SSID;  //define these in the secrets.h file to be created in the include folder  
+  const char* password = WIFI_PASS;
   // MQTT Broker settings - Use your PC's IP address
-  const char* mqtt_server = "192.168.1.0";  // Replace with your PC's IP address
+  const char* mqtt_server = MQTT_BROKER ;  // Replace with your PC's IP address
   const int mqtt_port = 1883;               // Default MQTT port
   const char* client_id = "ESP32_PowerMonitor";
 
