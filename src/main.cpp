@@ -7,6 +7,7 @@
   #include <Adafruit_SH110X.h>
   #include <INA226.h>
   #include "secrets.h"
+  #include <PID_v1.h>
 
   // Pins
   #define INA_SDA 18
@@ -21,6 +22,21 @@
   //braking
   #define PWM_FREQ 5000
   #define PWM_RES 8
+  #define PID_SAMPLE_TIME 100  // PID calculation time in milliseconds
+
+  // PID variables
+  double pidSetpoint = 8.0;     // Target voltage we want to maintain during braking
+  double pidInput;              // Current voltage (input to PID)
+  double pidOutput;             // PWM duty cycle (output from PID)
+  double pidKp = 2.0;           // Proportional gain
+  double pidKi = 0.5;           // Integral gain
+  double pidKd = 0.1;           // Derivative gain
+  int minDuty = 12;             // Minimum duty cycle
+  int maxDuty = 245;            // Maximum duty cycle
+
+  // Initialize PID controller
+  PID brakePID(&pidInput, &pidOutput, &pidSetpoint, pidKp, pidKi, pidKd, DIRECT);
+
   // WiFi credentials
   const char* ssid = WIFI_SSID;  //define these in the secrets.h file to be created in the include folder  
   const char* password = WIFI_PASS;
@@ -58,6 +74,7 @@
   void setupWifi();
   void reconnectMqtt();
   void publishJsonData(float voltage, float shuntMV, float current, float power, const char* mode);
+  void updateBraking(float voltage);
 
   void setup() {
       // Setup channels and attach to pins
@@ -67,6 +84,10 @@
     ledcSetup(BRAKE_CH2, PWM_FREQ, PWM_RES);
     ledcAttachPin(BRAKE_PIN2, BRAKE_CH2);
     
+    // Initialize PID controller
+    brakePID.SetMode(AUTOMATIC);
+    brakePID.SetSampleTime(PID_SAMPLE_TIME);
+    brakePID.SetOutputLimits(minDuty, maxDuty);
     Serial.begin(115200);
     Wire.begin(INA_SDA, INA_SCL); //First Voltage sensor 
     // PwrSensor1.begin(INA_SDA, INA_SCL); //First Voltage sensor
@@ -114,18 +135,19 @@
     current = INA.getCurrent_mA() / 1000.0; // Convert to A
     power = INA.getPower_mW() / 1000.0;     // Convert to W
 
-    int start_duty = 245;
-    int end_duty =12;
-
-    if(voltage>8.5){
-      for(int duty =start_duty; duty<=end_duty; duty++){
-        ledcWrite(BRAKE_CH1, duty);
-        ledcWrite(BRAKE_CH2, duty);
-        delay(10);
-      }
 
 
+    // Replace the existing braking logic with PID-based braking
+    updateBraking(voltage);
+    
+    // If voltage is high, set mode to BRAKE
+    if (voltage > pidSetpoint) {
+        mode = "BRAKE";
+    } else {
+        mode = "GEN";
     }
+
+
     display.clearDisplay();
     display.setCursor(0, 0);
     display.setTextSize(1);
@@ -348,4 +370,68 @@
     // Serial.println();  
     delay(1000);
   }
+}
+
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+    // Convert payload to string
+    char message[length + 1];
+    for (unsigned int i = 0; i < length; i++) {
+        message[i] = (char)payload[i];
+    }
+    message[length] = '\0';
+    
+    // Check if it's a setpoint command
+    if (strcmp(topic, "powermonitor/setpoint") == 0) {
+        float newSetpoint = atof(message);
+        if (newSetpoint > 0 && newSetpoint < 20) {  // Sanity check
+            pidSetpoint = newSetpoint;
+            Serial.print("New PID setpoint: ");
+            Serial.println(pidSetpoint);
+        }
+    }
+}
+
+void updateBraking(float voltage) {
+    static unsigned long lastPidTime = 0;
+    static bool brakingActive = false;
+    static const char* brakeMode = "IDLE";
+    
+    // Update PID input with current voltage
+    pidInput = voltage;
+    
+    // Determine if we need to start braking
+    if (voltage > pidSetpoint + 0.5) {  // Add some hysteresis
+        brakingActive = true;
+        brakeMode = "BRAKE";
+    } else if (voltage < pidSetpoint - 0.5) {
+        brakingActive = false;
+        brakeMode = "IDLE";
+        
+        // When not braking, set PWM to minimum (effectively off)
+        ledcWrite(BRAKE_CH1, 0);
+        ledcWrite(BRAKE_CH2, 0);
+        return;
+    }
+    
+    // If braking is active, compute PID and apply PWM
+    if (brakingActive) {
+        // Compute PID at regular intervals
+        if (millis() - lastPidTime >= PID_SAMPLE_TIME) {
+            brakePID.Compute();
+            lastPidTime = millis();
+            
+            // Apply the PID output to both brake channels
+            int dutyValue = (int)pidOutput;
+            ledcWrite(BRAKE_CH1, dutyValue);
+            ledcWrite(BRAKE_CH2, dutyValue);
+            
+            // Debug output
+            Serial.print("PID Braking - Target: ");
+            Serial.print(pidSetpoint);
+            Serial.print("V, Current: ");
+            Serial.print(voltage);
+            Serial.print("V, PWM Duty: ");
+            Serial.println(dutyValue);
+        }
+    }
 }
